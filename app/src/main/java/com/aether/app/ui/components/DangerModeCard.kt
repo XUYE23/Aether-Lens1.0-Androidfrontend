@@ -10,10 +10,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ElevatedCard
@@ -158,7 +156,7 @@ fun DangerWarningDialog(
 // ══════════════════════════════════════════════════════════════════════════════
 
 @Composable
-fun DangerModeOverlay() {
+fun DangerModeOverlay(modifier: Modifier = Modifier) {
     val infiniteTransition = rememberInfiniteTransition(label = "danger_overlay")
     val alpha by infiniteTransition.animateFloat(
         initialValue = 0.5f,
@@ -170,6 +168,7 @@ fun DangerModeOverlay() {
         label = "danger_text_alpha"
     )
     Text(
+        modifier = modifier,
         text = "危险模式",
         fontSize = 40.sp,
         fontWeight = FontWeight.Black,
