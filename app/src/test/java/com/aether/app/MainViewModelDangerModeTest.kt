@@ -73,11 +73,13 @@ class MainViewModelDangerModeTest {
 
     @After
     fun tearDown() {
-        // Cancel viewModelScope to stop Eagerly StateFlow collection
+        Dispatchers.resetMain()
+        // TODO: Replace with lifecycle-runtime-testing TestViewModelStoreOwner when available.
+        // We call ViewModel.clear() via reflection to stop the Eagerly-started StateFlow
+        // collector. This is fragile — revisit if lifecycle library is upgraded past 2.7.0.
         val clearMethod = androidx.lifecycle.ViewModel::class.java.getDeclaredMethod("clear")
         clearMethod.isAccessible = true
         clearMethod.invoke(viewModel)
-        Dispatchers.resetMain()
     }
 
     @Test

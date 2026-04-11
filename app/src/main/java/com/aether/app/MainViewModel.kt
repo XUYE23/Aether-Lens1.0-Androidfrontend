@@ -262,6 +262,9 @@ class MainViewModel(
 
     /** 用户在警告弹窗中点击"确认并开启" */
     fun confirmDangerMode() {
+        // DataStore write is async — in the rare case the process is killed before
+        // this coroutine completes, hasSeenDangerWarning won't be persisted and the
+        // user will see the warning dialog once more on next launch. Accepted tradeoff.
         viewModelScope.launch {
             repository.saveHasSeenDangerWarning(true)
         }
