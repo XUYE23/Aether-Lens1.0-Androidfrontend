@@ -1,9 +1,12 @@
 package com.aether.app
 
-import androidx.test.core.app.ApplicationProvider
 import app.cash.turbine.test
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -16,7 +19,41 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
-import com.aether.app.data.UserPreferencesRepository
+import com.aether.app.data.ApiConfig
+import com.aether.app.data.IUserPreferencesRepository
+
+/**
+ * 纯内存版 Repository，用于单元测试。
+ * 所有数据由 MutableStateFlow 承载，不涉及任何文件 IO，
+ * 彻底规避 Windows 上 DataStore File.renameTo() 文件锁问题。
+ */
+private class FakeUserPreferencesRepository : IUserPreferencesRepository {
+    private val _userName = MutableStateFlow(IUserPreferencesRepository.DEFAULT_USER_NAME)
+    override val userName: Flow<String> = _userName.asStateFlow()
+
+    private val _avatarUriString = MutableStateFlow<String?>(null)
+    override val avatarUriString: Flow<String?> = _avatarUriString.asStateFlow()
+
+    private val _activeApiId = MutableStateFlow<String?>(null)
+    override val activeApiId: Flow<String?> = _activeApiId.asStateFlow()
+
+    private val _apiConfigsJson = MutableStateFlow<String?>(null)
+    override val apiConfigsJson: Flow<String?> = _apiConfigsJson.asStateFlow()
+
+    private val _hasSeenDangerWarning = MutableStateFlow(false)
+    override val hasSeenDangerWarning: Flow<Boolean> = _hasSeenDangerWarning.asStateFlow()
+
+    override suspend fun saveUserName(name: String) { _userName.value = name }
+    override suspend fun saveAvatarUri(uriString: String) { _avatarUriString.value = uriString }
+    override suspend fun saveActiveApiId(id: String) { _activeApiId.value = id }
+    override suspend fun saveApiConfigs(configs: List<ApiConfig>) {
+        _apiConfigsJson.value = configs.toString()
+    }
+    override suspend fun saveHasSeenDangerWarning(value: Boolean) {
+        _hasSeenDangerWarning.value = value
+    }
+    override fun deserializeConfigs(json: String): List<ApiConfig> = emptyList()
+}
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -24,18 +61,22 @@ import com.aether.app.data.UserPreferencesRepository
 class MainViewModelDangerModeTest {
 
     private val dispatcher = StandardTestDispatcher()
-    private lateinit var repository: UserPreferencesRepository
+    private lateinit var repository: FakeUserPreferencesRepository
     private lateinit var viewModel: MainViewModel
 
     @Before
     fun setUp() {
         Dispatchers.setMain(dispatcher)
-        repository = UserPreferencesRepository(ApplicationProvider.getApplicationContext())
+        repository = FakeUserPreferencesRepository()
         viewModel = MainViewModel(repository)
     }
 
     @After
     fun tearDown() {
+        // Cancel viewModelScope to stop Eagerly StateFlow collection
+        val clearMethod = androidx.lifecycle.ViewModel::class.java.getDeclaredMethod("clear")
+        clearMethod.isAccessible = true
+        clearMethod.invoke(viewModel)
         Dispatchers.resetMain()
     }
 
@@ -81,6 +122,8 @@ class MainViewModelDangerModeTest {
         dispatcher.scheduler.advanceUntilIdle()
         viewModel.confirmDangerMode()
         dispatcher.scheduler.advanceUntilIdle()
+        // FakeRepository 使用 MutableStateFlow，写入是同步的，advanceUntilIdle 足够
+        assertTrue(viewModel.hasSeenDangerWarning.first())
         viewModel.dismissDangerMode()
         dispatcher.scheduler.advanceUntilIdle()
 

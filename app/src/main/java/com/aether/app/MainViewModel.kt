@@ -5,7 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.aether.app.data.ApiConfig
-import com.aether.app.data.UserPreferencesRepository
+import com.aether.app.data.IUserPreferencesRepository
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -73,7 +73,7 @@ data class PersonalSpaceUiState(
 // ══════════════════════════════════════════════════════════════════════════════
 
 class MainViewModel(
-    private val repository: UserPreferencesRepository
+    private val repository: IUserPreferencesRepository
 ) : ViewModel() {
 
     // ── 持久化状态（来自 DataStore，转为 StateFlow 供 UI 收集） ───────────────
@@ -82,7 +82,7 @@ class MainViewModel(
     val userName: StateFlow<String> = repository.userName.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = UserPreferencesRepository.DEFAULT_USER_NAME
+        initialValue = IUserPreferencesRepository.DEFAULT_USER_NAME
     )
 
     /** 当前头像 URI 字符串（null 表示未设置） */
@@ -95,12 +95,9 @@ class MainViewModel(
     /** 是否已看过危险模式警告（持久化）；初始值 false 为安全默认 */
     val hasSeenDangerWarning: StateFlow<Boolean> = repository.hasSeenDangerWarning.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5_000),
+        started = SharingStarted.Eagerly,
         initialValue = false
     )
-
-    /** 内存中的"已看过警告"标志，供 toggleDangerMode 同步读取；confirmDangerMode 时立即写入 */
-    private val _hasSeenDangerWarningMem = MutableStateFlow(false)
 
     // ── 瞬态 UI 状态 ─────────────────────────────────────────────────────────
 
@@ -256,7 +253,7 @@ class MainViewModel(
             dismissDangerMode()
             return
         }
-        if (_hasSeenDangerWarningMem.value) {
+        if (hasSeenDangerWarning.value) {
             _uiState.update { it.copy(isDangerModeActive = true) }
         } else {
             _uiState.update { it.copy(showDangerWarningDialog = true) }
@@ -265,7 +262,6 @@ class MainViewModel(
 
     /** 用户在警告弹窗中点击"确认并开启" */
     fun confirmDangerMode() {
-        _hasSeenDangerWarningMem.value = true
         viewModelScope.launch {
             repository.saveHasSeenDangerWarning(true)
         }
@@ -287,7 +283,7 @@ class MainViewModel(
 // ══════════════════════════════════════════════════════════════════════════════
 
 class MainViewModelFactory(
-    private val repository: UserPreferencesRepository
+    private val repository: IUserPreferencesRepository
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
