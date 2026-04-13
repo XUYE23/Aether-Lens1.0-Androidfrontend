@@ -2,6 +2,7 @@ package com.aether.app.ui.screens
 
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
 import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
@@ -197,15 +198,15 @@ fun PersonalNexusContent(
     onToggleToolAuthorization: (String) -> Unit,
     onClearToolConnectingMessage: () -> Unit,
 ) {
-    Box(modifier = Modifier.fillMaxSize()) {
-
-        val context = LocalContext.current
-        LaunchedEffect(uiState.toolConnectingMessage) {
-            uiState.toolConnectingMessage?.let { msg ->
-                android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
-                onClearToolConnectingMessage()
-            }
+    val context = LocalContext.current
+    LaunchedEffect(uiState.toolConnectingMessage) {
+        uiState.toolConnectingMessage?.let { msg ->
+            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+            onClearToolConnectingMessage()
         }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
 
         Column(
             modifier = Modifier
