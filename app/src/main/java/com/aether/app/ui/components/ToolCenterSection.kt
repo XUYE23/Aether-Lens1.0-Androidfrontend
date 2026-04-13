@@ -50,8 +50,15 @@ private val DotUnauthorizedColor = Color(0xFF9E9E9E)
 fun ToolCenterCard(
     tool: ToolState,
     onToggle: () -> Unit,
+    entryDelayMs: Long = 0L,
     modifier: Modifier = Modifier
 ) {
+    val fadeAlpha = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        delay(entryDelayMs)
+        fadeAlpha.animateTo(1f, animationSpec = tween(300))
+    }
+
     val dotColor by animateColorAsState(
         targetValue   = if (tool.isAuthorized) DotAuthorizedColor else DotUnauthorizedColor,
         animationSpec = tween(400),
@@ -73,7 +80,7 @@ fun ToolCenterCard(
     }
 
     ElevatedCard(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth().alpha(fadeAlpha.value),
         shape    = RoundedCornerShape(20.dp)
     ) {
         Row(
@@ -140,17 +147,11 @@ fun ToolCenterSection(
     ) {
         toolItems.forEachIndexed { index, tool ->
             key(tool.id) {
-                val fadeAlpha = remember { Animatable(0f) }
-                LaunchedEffect(Unit) {
-                    delay(index * 100L)
-                    fadeAlpha.animateTo(1f, animationSpec = tween(300))
-                }
-                Box(modifier = Modifier.alpha(fadeAlpha.value)) {
-                    ToolCenterCard(
-                        tool     = tool,
-                        onToggle = { onToggle(tool.id) }
-                    )
-                }
+                ToolCenterCard(
+                    tool         = tool,
+                    entryDelayMs = index * 100L,
+                    onToggle     = { onToggle(tool.id) }
+                )
             }
         }
     }
