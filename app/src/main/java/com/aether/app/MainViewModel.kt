@@ -81,6 +81,7 @@ data class PersonalSpaceUiState(
     // ── 工具中心 ──────────────────────────────────────────────────────────────────
     val toolItems: List<ToolState> = defaultToolList(),
     val toolConnectingMessage: String? = null,
+    val toolConnectingSeq: Int = 0,
 )
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -305,7 +306,8 @@ class MainViewModel(
                 toolItems = state.toolItems.map {
                     if (it.id == id) it.copy(isAuthorized = !it.isAuthorized) else it
                 },
-                toolConnectingMessage = message
+                toolConnectingMessage = message,
+                toolConnectingSeq = state.toolConnectingSeq + 1
             )
         }
     }

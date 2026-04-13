@@ -199,7 +199,7 @@ fun PersonalNexusContent(
     onClearToolConnectingMessage: () -> Unit,
 ) {
     val context = LocalContext.current
-    LaunchedEffect(uiState.toolConnectingMessage) {
+    LaunchedEffect(uiState.toolConnectingSeq) {
         uiState.toolConnectingMessage?.let { msg ->
             Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
             onClearToolConnectingMessage()
