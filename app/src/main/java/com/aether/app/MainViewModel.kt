@@ -1,11 +1,17 @@
 package com.aether.app
 
 import android.net.Uri
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.aether.app.data.ApiConfig
 import com.aether.app.data.IUserPreferencesRepository
+import com.aether.app.data.ToolState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -21,6 +27,12 @@ import kotlinx.coroutines.launch
 //  UI State（瞬态交互状态，不持久化）
 //  持久化数据（userName / avatarUri）由 Repository 的 StateFlow 单独提供
 // ══════════════════════════════════════════════════════════════════════════════
+
+private fun defaultToolList() = listOf(
+    ToolState(id = "feishu",   name = "飞书", icon = Icons.AutoMirrored.Filled.Send, iconTint = Color(0xFF2B5BFF), isAuthorized = false),
+    ToolState(id = "calendar", name = "日历", icon = Icons.Default.DateRange,         iconTint = Color(0xFF4CAF50), isAuthorized = false),
+    ToolState(id = "email",    name = "邮件", icon = Icons.Default.Email,             iconTint = Color(0xFF9C27B0), isAuthorized = false),
+)
 
 data class PersonalSpaceUiState(
     val profileTraits: List<String> = listOf(
@@ -66,6 +78,9 @@ data class PersonalSpaceUiState(
     // ── 危险模式 ──────────────────────────────────────────────────────────────────
     val isDangerModeActive: Boolean = false,
     val showDangerWarningDialog: Boolean = false,
+    // ── 工具中心 ──────────────────────────────────────────────────────────────────
+    val toolItems: List<ToolState> = defaultToolList(),
+    val toolConnectingMessage: String? = null,
 )
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -278,6 +293,25 @@ class MainViewModel(
         _uiState.update {
             it.copy(isDangerModeActive = false, showDangerWarningDialog = false)
         }
+    }
+
+    // ── 工具中心 ──────────────────────────────────────────────────────────────────
+
+    fun toggleToolAuthorization(id: String) {
+        val tool = _uiState.value.toolItems.find { it.id == id } ?: return
+        val message = if (!tool.isAuthorized) "正在联通 ${tool.name}..." else "${tool.name} 已断开"
+        _uiState.update { state ->
+            state.copy(
+                toolItems = state.toolItems.map {
+                    if (it.id == id) it.copy(isAuthorized = !it.isAuthorized) else it
+                },
+                toolConnectingMessage = message
+            )
+        }
+    }
+
+    fun clearToolConnectingMessage() {
+        _uiState.update { it.copy(toolConnectingMessage = null) }
     }
 }
 
