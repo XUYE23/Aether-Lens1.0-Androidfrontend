@@ -91,6 +91,7 @@ import com.aether.app.PersonalSpaceUiState
 import com.aether.app.ui.components.DangerModeCard
 import com.aether.app.ui.components.DangerWarningDialog
 import com.aether.app.ui.components.MyDevicesSection
+import com.aether.app.ui.components.ToolCenterSection
 import com.aether.app.ui.theme.AetherTheme
 import com.aether.app.ui.theme.GlassBorder
 import com.aether.app.ui.theme.NeonPurple
@@ -152,6 +153,8 @@ fun PersonalNexusScreen(viewModel: MainViewModel, deviceViewModel: DeviceViewMod
             onToggleDangerMode   = viewModel::toggleDangerMode,
             onConfirmDangerMode  = viewModel::confirmDangerMode,
             onDismissDangerWarning = viewModel::dismissDangerMode,
+            onToggleToolAuthorization    = viewModel::toggleToolAuthorization,
+            onClearToolConnectingMessage = viewModel::clearToolConnectingMessage,
         )
         is PersonalSubScreen.ApiSelection -> ApiSelectionScreen(
             configs     = uiState.apiConfigs,
@@ -190,9 +193,19 @@ fun PersonalNexusContent(
     onNavigateToApiSelection: () -> Unit,
     onToggleDangerMode: () -> Unit,
     onConfirmDangerMode: () -> Unit,
-    onDismissDangerWarning: () -> Unit
+    onDismissDangerWarning: () -> Unit,
+    onToggleToolAuthorization: (String) -> Unit,
+    onClearToolConnectingMessage: () -> Unit,
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
+
+        val context = LocalContext.current
+        LaunchedEffect(uiState.toolConnectingMessage) {
+            uiState.toolConnectingMessage?.let { msg ->
+                android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+                onClearToolConnectingMessage()
+            }
+        }
 
         Column(
             modifier = Modifier
@@ -240,7 +253,11 @@ fun PersonalNexusContent(
                         isActive = uiState.isDangerModeActive,
                         onToggle = onToggleDangerMode
                     )
-                    SectionPlaceholder(label = "区域 5", minHeight = 112)
+                    SectionLabel("可用工具")
+                    ToolCenterSection(
+                        toolItems = uiState.toolItems,
+                        onToggle  = onToggleToolAuthorization
+                    )
                 }
             }
         }
