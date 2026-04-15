@@ -71,12 +71,13 @@ fun DangerModeCard(
                         color = if (isActive) Color(0xFFCC0000)
                                 else MaterialTheme.colorScheme.onSurface
                     )
-                    Text(
-                        text = if (isActive) "⚡ 直接执行中" else "开启后将直接执行",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (isActive) Color(0xFFCC6666)
-                                else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    if (isActive) {
+                        Text(
+                            text = "⚡ 直接执行中",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFFCC6666)
+                        )
+                    }
                 }
                 Switch(
                     checked = isActive,
@@ -176,8 +177,8 @@ fun DangerModeOverlay(modifier: Modifier = Modifier) {
         letterSpacing = 10.sp,
         style = TextStyle(
             shadow = Shadow(
-                color = Color.Red.copy(alpha = 0.8f),
-                blurRadius = 20f
+                color = Color.Red.copy(alpha = 0.4f),
+                blurRadius = 10f
             )
         )
     )
