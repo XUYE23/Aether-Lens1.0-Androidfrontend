@@ -22,7 +22,8 @@ class WorkspaceCardStateHolderTest {
             voiceManager = mock,
             scope = scope,
             onExecuteCommand = onExecuteCommand,
-            initialCards = MockData.getCardList()
+            initialCards = MockData.getCardList(),
+            timerScope = (scope as kotlinx.coroutines.test.TestScope).backgroundScope
         )
         return holder to mock
     }
