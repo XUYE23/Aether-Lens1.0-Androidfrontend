@@ -21,7 +21,7 @@ enum class MockScript { Success, Empty, NetworkError }
  *   Success      – types "提醒张三下午三点开会" char-by-char (60ms/char),
  *                  stopListening() emits that text as finalText.
  *   Empty        – stopListening() emits finalText = "" (silent cancel path).
- *   NetworkError – emits RecognitionError.NETWORK after 800ms; stopListening() is a no-op.
+ *   NetworkError – emits RecognitionError.NETWORK after 500ms; stopListening() is a no-op.
  */
 class MockVoiceRecognitionManager(
     private val script: MockScript = MockScript.Success,
@@ -50,6 +50,7 @@ class MockVoiceRecognitionManager(
         _partialText.value = ""
         _finalText.value = null
         _errorCode.value = null
+        _rmsDb.value = 0f
         _state.value = RecognitionState.Preparing
 
         scriptJob = scope.launch {
