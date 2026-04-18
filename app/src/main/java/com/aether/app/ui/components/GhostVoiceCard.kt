@@ -105,27 +105,21 @@ fun GhostVoiceCard(
     Box(
         modifier = modifier
             .fillMaxWidth(0.75f)
-            .height(380.dp),
+            .height(380.dp)
+            // Outer glow drawn directly on the root Box — no negative padding needed
+            .graphicsLayer { alpha = glowAlpha; scaleX = glowScale; scaleY = glowScale }
+            .drawBehind {
+                drawRoundRect(
+                    brush = Brush.radialGradient(
+                        colors = listOf(glowColor.copy(alpha = 0.22f), Color.Transparent),
+                        center = Offset(size.width / 2f, size.height / 2f),
+                        radius = maxOf(size.width, size.height) * 0.85f
+                    ),
+                    cornerRadius = CornerRadius(28.dp.toPx())
+                )
+            },
         contentAlignment = Alignment.Center
     ) {
-        // Outer glow
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding((-12).dp)
-                .graphicsLayer { alpha = glowAlpha; scaleX = glowScale; scaleY = glowScale }
-                .drawBehind {
-                    drawRoundRect(
-                        brush = Brush.radialGradient(
-                            colors = listOf(glowColor.copy(alpha = 0.22f), Color.Transparent),
-                            center = Offset(size.width / 2f, size.height / 2f),
-                            radius = maxOf(size.width, size.height) * 0.7f
-                        ),
-                        cornerRadius = CornerRadius(28.dp.toPx())
-                    )
-                }
-        )
-
         // Card surface
         Box(
             modifier = Modifier
