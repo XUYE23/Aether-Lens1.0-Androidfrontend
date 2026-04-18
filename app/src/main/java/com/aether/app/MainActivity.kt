@@ -50,6 +50,19 @@ import com.aether.app.ui.screens.PersonalNexusScreen
 import com.aether.app.ui.theme.AetherTheme
 import com.aether.app.ui.theme.GlassBorder
 import com.aether.app.ui.theme.PureWhite
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.util.lerp
+import androidx.compose.ui.zIndex
+import androidx.compose.runtime.DisposableEffect
+import com.aether.app.ui.components.GhostVoiceCard
+import com.aether.app.voice.SpeechRecognizerImpl
+import com.aether.app.workspace.VoicePhase
+import com.aether.app.workspace.WorkspaceCardStateHolder
+import kotlin.math.roundToInt
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
@@ -226,95 +239,114 @@ fun WorkspaceScreen(userName: String, isDangerMode: Boolean = false) {
 
 @Composable
 fun AmbientHubScreen(userName: String, isDangerMode: Boolean = false) {
-    var cardList by remember { mutableStateOf(com.aether.app.data.MockData.getCardList()) }
-    var currentIndex by remember { mutableIntStateOf(0) }
-    var isTransitioning by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
-    val transitionProgress = remember { Animatable(0f) }
+    val context = LocalContext.current
+    val scope   = rememberCoroutineScope()
 
-    val onCardSwiped = {
-        if (currentIndex < cardList.size - 1 && !isTransitioning) {
-            scope.launch {
-                isTransitioning = true
-                transitionProgress.animateTo(
-                    targetValue  = 1f,
-                    animationSpec = tween(durationMillis = 600, easing = FastOutSlowInEasing)
-                )
-                currentIndex++
-                transitionProgress.snapTo(0f)
-                isTransitioning = false
+    val voiceManager = remember { SpeechRecognizerImpl(context) }
+    val holder = remember {
+        WorkspaceCardStateHolder(
+            voiceManager = voiceManager,
+            scope = scope,
+            onExecuteCommand = { text ->
+                android.util.Log.d("AmbientHub", "Execute command: $text")
             }
+        )
+    }
+    DisposableEffect(Unit) { onDispose { holder.dispose() } }
+
+    val phase        by holder.phase.collectAsState()
+    val cardStack    by holder.cardStack.collectAsState()
+    val currentIndex by holder.currentIndex.collectAsState()
+    val draft        by holder.draftVoiceCard.collectAsState()
+    val audioLevel   by holder.liveAudioLevel.collectAsState()
+
+    // UI-owned animation values — never stored in the state holder
+    val mainCardFlight = remember { Animatable(0f) }  // 0 = centre, 1 = stack slot
+    val ghostAlpha     = remember { Animatable(0f) }
+
+    LaunchedEffect(phase) {
+        when (phase) {
+            VoicePhase.Listening -> {
+                if (!isDangerMode) {
+                    launch {
+                        mainCardFlight.animateTo(
+                            1f, spring(dampingRatio = 0.8f, stiffness = 200f)
+                        )
+                    }
+                }
+                launch {
+                    if (!isDangerMode) delay(150)
+                    ghostAlpha.animateTo(1f, tween(400, easing = FastOutSlowInEasing))
+                }
+            }
+            VoicePhase.Dismissing -> {
+                launch {
+                    ghostAlpha.animateTo(0f, tween(300, easing = FastOutSlowInEasing))
+                }
+                if (!isDangerMode) {
+                    mainCardFlight.animateTo(
+                        0f, spring(dampingRatio = 0.8f, stiffness = 200f)
+                    )
+                }
+                holder.onDismissComplete()
+            }
+            else -> Unit
         }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
 
+        // ── Pre-existing cards (hidden in danger mode) ─────────────────────────
         AnimatedVisibility(
             visible = !isDangerMode,
             enter = fadeIn(animationSpec = tween(500)),
             exit  = fadeOut(animationSpec = tween(500))
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
-                if (currentIndex < cardList.size) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(top = 80.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        key(currentIndex) {
-                            SwipeCard(
-                                onSwipeLeft  = { onCardSwiped() },
-                                onSwipeRight = { onCardSwiped() }
-                            ) {
-                                ActionCardContent(cardList[currentIndex])
-                            }
-                        }
-                    }
-                }
-
-                if (currentIndex + 1 < cardList.size) {
-                    val progress = transitionProgress.value
-                    val scale    = 0.28f + (0.72f * progress)
-                    val currentX = 24f + (0f - 24f) * progress
-                    val currentY = 40f + (80f - 40f) * progress
-
+                // Next-up card (currentIndex + 1)
+                if (currentIndex + 1 < cardStack.size) {
+                    val transitionProgress = remember { Animatable(0f) }
+                    val scale  = 0.28f + (0.72f * transitionProgress.value)
+                    val tX     = 24f + (0f  - 24f) * transitionProgress.value
+                    val tY     = 40f + (80f - 40f) * transitionProgress.value
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.TopStart
                     ) {
                         Box(
                             modifier = Modifier
-                                .offset(x = currentX.dp, y = currentY.dp)
+                                .offset(x = tX.dp, y = tY.dp)
                                 .graphicsLayer {
-                                    scaleX = scale
-                                    scaleY = scale
-                                    transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
+                                    scaleX = scale; scaleY = scale
+                                    transformOrigin =
+                                        androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
                                 }
+                                .zIndex(20f)
                         ) {
                             SwipeCard(onSwipeLeft = {}, onSwipeRight = {}) {
-                                ActionCardContent(cardList[currentIndex + 1])
+                                ActionCardContent(cardStack[currentIndex + 1])
                             }
                         }
                     }
                 }
 
-                if (currentIndex + 2 < cardList.size) {
+                // CardStack pile (currentIndex + 2 and beyond)
+                if (currentIndex + 2 < cardStack.size) {
                     Box(
                         modifier = Modifier
                             .padding(top = 40.dp, start = 24.dp)
                             .align(Alignment.TopStart)
                     ) {
                         CardStack(
-                            remainingCount    = cardList.size - currentIndex - 2,
-                            nextCard          = cardList.getOrNull(currentIndex + 2),
-                            animationProgress = transitionProgress.value
+                            remainingCount = cardStack.size - currentIndex - 2,
+                            nextCard       = cardStack.getOrNull(currentIndex + 2)
                         )
                     }
                 }
             }
         }
 
+        // ── Danger mode overlay ───────────────────────────────────────────────
         AnimatedVisibility(
             visible = isDangerMode,
             enter = fadeIn(animationSpec = tween(500)),
@@ -330,21 +362,103 @@ fun AmbientHubScreen(userName: String, isDangerMode: Boolean = false) {
             }
         }
 
+        // ── Main card — spring flight between centre and stack slot ───────────
+        if (currentIndex < cardStack.size) {
+            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                val density = LocalDensity.current
+                with(density) {
+                    val screenW = constraints.maxWidth.toFloat()
+                    val screenH = constraints.maxHeight.toFloat()
+                    val cardW   = screenW * 0.75f
+                    val cardH   = 380.dp.toPx()
+                    val topPad  = 80.dp.toPx()
+                    val stackX  = 24.dp.toPx()
+                    val stackY  = 40.dp.toPx()
+
+                    val centreX = (screenW - cardW) / 2f
+                    val centreY = topPad + (screenH - topPad - cardH) / 2f
+
+                    val p     = mainCardFlight.value
+                    val curX  = lerp(centreX, stackX, p)
+                    val curY  = lerp(centreY, stackY, p)
+                    val scale = lerp(1f, 0.28f, p)
+
+                    Box(
+                        modifier = Modifier
+                            .offset { IntOffset(curX.roundToInt(), curY.roundToInt()) }
+                            .graphicsLayer {
+                                scaleX = scale; scaleY = scale
+                                transformOrigin =
+                                    androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
+                            }
+                            .zIndex(if (mainCardFlight.isRunning) 100f else 30f)
+                    ) {
+                        key(currentIndex) {
+                            if (phase == VoicePhase.Idle) {
+                                SwipeCard(
+                                    onSwipeLeft  = { holder.onSwipeCurrentCard() },
+                                    onSwipeRight = { holder.onSwipeCurrentCard() }
+                                ) {
+                                    ActionCardContent(cardStack[currentIndex])
+                                }
+                            } else {
+                                ActionCardContent(cardStack[currentIndex])
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── Ghost voice card ─────────────────────────────────────────────────
+        if (draft != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = 80.dp)
+                    .graphicsLayer { alpha = ghostAlpha.value }
+                    .zIndex(50f),
+                contentAlignment = Alignment.Center
+            ) {
+                if (phase == VoicePhase.Editable || phase == VoicePhase.Error) {
+                    SwipeCard(
+                        onSwipeLeft  = { holder.onDraftSwipedLeft() },
+                        onSwipeRight = { holder.onDraftSwipedRight() }
+                    ) {
+                        GhostVoiceCard(
+                            draft          = draft!!,
+                            liveAudioLevel = audioLevel,
+                            isDangerMode   = isDangerMode,
+                            onTextChange   = holder::onDraftTextEdited
+                        )
+                    }
+                } else {
+                    GhostVoiceCard(
+                        draft          = draft!!,
+                        liveAudioLevel = audioLevel,
+                        isDangerMode   = isDangerMode,
+                        onTextChange   = holder::onDraftTextEdited
+                    )
+                }
+            }
+        }
+
+        // ── AuroraWaveHalo ────────────────────────────────────────────────────
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.BottomCenter)
         ) {
             AuroraWaveHalo(
-                audioLevel = 0.5f,
-                isListening = false,
-                onPressStart = {},
-                onPressEnd = {},
+                audioLevel   = audioLevel,
+                isListening  = phase in setOf(VoicePhase.Listening, VoicePhase.Editable),
+                onPressStart = { holder.onHaloPressStart() },
+                onPressEnd   = { holder.onHaloPressEnd() },
                 isDangerMode = isDangerMode
             )
         }
 
-        // 右上角用户名 — 动态来自 DataStore，与个人空间保持同步
+        // ── Username (top-right) ──────────────────────────────────────────────
         Box(
             modifier = Modifier
                 .fillMaxWidth()
