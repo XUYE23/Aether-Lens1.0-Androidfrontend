@@ -337,7 +337,9 @@ fun AmbientHubScreen(userName: String, isDangerMode: Boolean = false) {
         ) {
             AuroraWaveHalo(
                 audioLevel = 0.5f,
-                onLongPress = { /* TODO: Voice input */ },
+                isListening = false,
+                onPressStart = {},
+                onPressEnd = {},
                 isDangerMode = isDangerMode
             )
         }
