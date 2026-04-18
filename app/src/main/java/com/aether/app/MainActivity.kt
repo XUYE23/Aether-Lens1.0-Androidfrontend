@@ -280,7 +280,7 @@ fun AmbientHubScreen(userName: String, isDangerMode: Boolean = false) {
                 }
             }
             VoicePhase.Dismissing -> {
-                launch {
+                val ghostFade = launch {
                     ghostAlpha.animateTo(0f, tween(300, easing = FastOutSlowInEasing))
                 }
                 if (!isDangerMode) {
@@ -288,6 +288,7 @@ fun AmbientHubScreen(userName: String, isDangerMode: Boolean = false) {
                         0f, spring(dampingRatio = 0.8f, stiffness = 200f)
                     )
                 }
+                ghostFade.join()  // ensure ghost has fully faded before clearing draft
                 holder.onDismissComplete()
             }
             else -> Unit
