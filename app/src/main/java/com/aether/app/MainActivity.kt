@@ -428,7 +428,6 @@ fun AmbientHubScreen(userName: String, isDangerMode: Boolean = false) {
                     ) {
                         GhostVoiceCard(
                             draft          = draft!!,
-                            liveAudioLevel = audioLevel,
                             isDangerMode   = isDangerMode,
                             onTextChange   = holder::onDraftTextEdited
                         )
@@ -436,7 +435,6 @@ fun AmbientHubScreen(userName: String, isDangerMode: Boolean = false) {
                 } else {
                     GhostVoiceCard(
                         draft          = draft!!,
-                        liveAudioLevel = audioLevel,
                         isDangerMode   = isDangerMode,
                         onTextChange   = holder::onDraftTextEdited
                     )

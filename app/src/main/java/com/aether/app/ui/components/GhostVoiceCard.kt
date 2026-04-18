@@ -42,7 +42,6 @@ import kotlinx.coroutines.delay
 @Composable
 fun GhostVoiceCard(
     draft: DraftVoiceCard,
-    liveAudioLevel: Float,
     isDangerMode: Boolean = false,
     onTextChange: (String) -> Unit,
     modifier: Modifier = Modifier
@@ -259,7 +258,6 @@ fun GhostVoiceCard(
 private fun GhostVoiceCard_Listening_Normal_Preview() {
     GhostVoiceCard(
         draft = DraftVoiceCard(partialText = "提醒张三下午三点"),
-        liveAudioLevel = 0.6f,
         isDangerMode = false,
         onTextChange = {}
     )
@@ -270,7 +268,6 @@ private fun GhostVoiceCard_Listening_Normal_Preview() {
 private fun GhostVoiceCard_Editable_Normal_Preview() {
     GhostVoiceCard(
         draft = DraftVoiceCard(finalText = "提醒张三下午三点开会"),
-        liveAudioLevel = 0f,
         isDangerMode = false,
         onTextChange = {}
     )
@@ -281,7 +278,6 @@ private fun GhostVoiceCard_Editable_Normal_Preview() {
 private fun GhostVoiceCard_Listening_Danger_Preview() {
     GhostVoiceCard(
         draft = DraftVoiceCard(partialText = "提醒张三下午三点"),
-        liveAudioLevel = 0.7f,
         isDangerMode = true,
         onTextChange = {}
     )
@@ -292,7 +288,6 @@ private fun GhostVoiceCard_Listening_Danger_Preview() {
 private fun GhostVoiceCard_Error_Preview() {
     GhostVoiceCard(
         draft = DraftVoiceCard(partialText = "提醒", errorMessage = "识别失败"),
-        liveAudioLevel = 0f,
         isDangerMode = false,
         onTextChange = {}
     )
