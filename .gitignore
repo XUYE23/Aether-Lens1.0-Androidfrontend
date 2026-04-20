@@ -1,2 +1,9 @@
 # Superpowers brainstorm artefacts (local only)
 .superpowers/
+.claude/
+.gradle/
+.idea/
+build/
+app/build/
+local.properties
+docs/superpowers/plans/

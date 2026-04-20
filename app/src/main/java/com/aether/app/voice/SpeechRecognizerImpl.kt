@@ -7,6 +7,7 @@ import android.os.Bundle
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer as AndroidSR
+import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
@@ -29,6 +30,10 @@ class SpeechRecognizerImpl(
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.Default)
 ) : VoiceRecognitionManager {
 
+    companion object {
+        private const val TAG = "SpeechImpl"
+    }
+
     private val _partialText = MutableStateFlow("")
     override val partialText: StateFlow<String> = _partialText
 
@@ -48,39 +53,49 @@ class SpeechRecognizerImpl(
 
     private val listener = object : RecognitionListener {
         override fun onReadyForSpeech(params: Bundle?) {
+            Log.d(TAG, "onReadyForSpeech — mic open, ready for input")
             _state.value = RecognitionState.Listening
         }
-        override fun onBeginningOfSpeech() {}
+        override fun onBeginningOfSpeech() {
+            Log.d(TAG, "onBeginningOfSpeech — voice activity detected")
+        }
         override fun onRmsChanged(rmsdB: Float) {
             // SpeechRecognizer reports roughly -2..10 dB; normalise to 0..1
             _rmsDb.value = ((rmsdB + 2f) / 12f).coerceIn(0f, 1f)
         }
         override fun onBufferReceived(buffer: ByteArray?) {}
         override fun onEndOfSpeech() {
+            Log.d(TAG, "onEndOfSpeech — silence detected, finalizing")
             _state.value = RecognitionState.Finalizing
         }
         override fun onPartialResults(partialResults: Bundle?) {
             val texts = partialResults
                 ?.getStringArrayList(AndroidSR.RESULTS_RECOGNITION)
-            _partialText.value = texts?.firstOrNull() ?: ""
+            val partial = texts?.firstOrNull() ?: ""
+            Log.d(TAG, "onPartialResults: \"$partial\"")
+            _partialText.value = partial
         }
         override fun onResults(results: Bundle?) {
             val text = results
                 ?.getStringArrayList(AndroidSR.RESULTS_RECOGNITION)
                 ?.firstOrNull() ?: ""
+            Log.d(TAG, "onResults: \"$text\"")
             _finalText.value = text
             _rmsDb.value = 0f
             _state.value = RecognitionState.Idle
         }
         override fun onError(error: Int) {
+            Log.w(TAG, "onError: code=$error")
             _rmsDb.value = 0f
             when (error) {
                 AndroidSR.ERROR_INSUFFICIENT_PERMISSIONS -> {
+                    Log.w(TAG, "onError → Denied (INSUFFICIENT_PERMISSIONS)")
                     _state.value = RecognitionState.Denied
                 }
                 AndroidSR.ERROR_NO_MATCH,
                 AndroidSR.ERROR_SPEECH_TIMEOUT -> {
                     // Silent: treat as empty result (no red-text error shown)
+                    Log.d(TAG, "onError → silent cancel (NO_MATCH or SPEECH_TIMEOUT)")
                     _finalText.value = ""
                     _state.value = RecognitionState.Idle
                 }
@@ -92,6 +107,7 @@ class SpeechRecognizerImpl(
                         AndroidSR.ERROR_AUDIO           -> RecognitionError.AUDIO
                         else                            -> RecognitionError.OTHER
                     }
+                    Log.w(TAG, "onError → Error($code)")
                     _errorCode.value = code
                     _state.value = RecognitionState.Error(code)
                 }
@@ -104,9 +120,11 @@ class SpeechRecognizerImpl(
         scope.launch {
             withContext(Dispatchers.Main) {
                 if (!AndroidSR.isRecognitionAvailable(context)) {
+                    Log.w(TAG, "startListening: recognition not available on this device")
                     _state.value = RecognitionState.Denied
                     return@withContext
                 }
+                Log.d(TAG, "startListening: locale=$locale, creating recognizer")
                 _partialText.value = ""
                 _finalText.value = null
                 _errorCode.value = null
@@ -124,6 +142,7 @@ class SpeechRecognizerImpl(
                         putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
                         putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
                     }
+                    Log.d(TAG, "startListening: calling sr.startListening()")
                     sr.startListening(intent)
                 }
             }

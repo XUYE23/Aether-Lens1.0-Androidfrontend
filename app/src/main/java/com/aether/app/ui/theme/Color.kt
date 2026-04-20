@@ -2,20 +2,32 @@ package com.aether.app.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Brand Colors - Deep Sea Blue to Neon Purple
-val DeepSeaBlue = Color(0xFF0A1929)
-val NeonPurple = Color(0xFF7C3AED)
+// ── Ink & Cream ──────────────────────────────────────────────────────────────
+val Ink900   = Color(0xFF1A1614)
+val Ink700   = Color(0xFF3D342E)
+val Ink500   = Color(0xFF6B5F57)
+val Ink300   = Color(0xFFA89B90)
+val Ink200   = Color(0xFFC9BEB4)
 
-// Background - White Theme
-val PureWhite = Color(0xFFFFFFFF)
-val LightGray = Color(0xFFF5F5F5)
+val Cream50  = Color(0xFFFAF6F0)
+val Cream100 = Color(0xFFF3ECE2)
+val Cream200 = Color(0xFFE8DDCE)
+val Cream300 = Color(0xFFD9CBB6)
 
-// Action Colors
-val ConfirmBlue = Color(0xFF00D9FF)
-val RejectRed = Color(0xFFFF4444)
-val DangerAmber = Color(0xFFFFA726)
+// ── Dawn Gradient ─────────────────────────────────────────────────────────────
+val DawnDusk  = Color(0xFF2E2438)
+val DawnMauve = Color(0xFF7C5A6B)
+val DawnEmber = Color(0xFFB85C3C)
+val DawnPeach = Color(0xFFE8A57A)
+val DawnHaze  = Color(0xFFF2D6B3)
+val DawnGlow  = Color(0xFFFAEBD0)
 
-// Glass Effect - Adapted for White Background
-val GlassSurface = Color(0x0A000000)
-val GlassBorder = Color(0xFF333333)
-val LightBorder = Color(0xFFE0E0E0)
+// ── Legacy aliases (pre-redesign components that haven't been updated yet) ──
+val GlassSurface = Cream100.copy(alpha = 0.92f)
+val GlassBorder  = Ink700
+val LightBorder  = Ink200.copy(alpha = 0.8f)
+val PureWhite    = Cream50
+val NeonPurple   = DawnMauve
+val DeepSeaBlue  = DawnDusk
+val ConfirmBlue  = Color(0xFF4A90D9)
+val RejectRed    = Color(0xFFD94A4A)

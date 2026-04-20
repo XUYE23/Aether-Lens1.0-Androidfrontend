@@ -229,6 +229,14 @@ class MainViewModel(
         _uiState.update { it.copy(editNameInput = text, editNameError = false) }
     }
 
+    fun updateUserName(name: String) {
+        val trimmed = name.trim()
+        if (trimmed.isEmpty()) return
+        viewModelScope.launch {
+            repository.saveUserName(trimmed)
+        }
+    }
+
     // ── API 配置管理 ──────────────────────────────────────────────────────────
 
     fun selectApi(id: String) {
@@ -248,9 +256,7 @@ class MainViewModel(
             _uiState.update { it.copy(editNameError = true) }
             return
         }
-        viewModelScope.launch {
-            repository.saveUserName(trimmed)           // 写入 DataStore（持久化）
-        }
+        updateUserName(trimmed)
         _uiState.update {
             it.copy(showEditNameDialog = false, editNameInput = "", editNameError = false)
         }

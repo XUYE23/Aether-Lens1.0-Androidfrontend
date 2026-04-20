@@ -46,6 +46,9 @@ android {
 }
 
 dependencies {
+    // 科大讯飞 SparkChain SDK（语音听写）
+    implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.aar", "*.jar"))))
+
     val composeBom = platform("androidx.compose:compose-bom:2024.01.00")
     implementation(composeBom)
 
@@ -72,6 +75,12 @@ dependencies {
     // Gson — API 配置列表序列化
     implementation("com.google.code.gson:gson:2.10.1")
 
+    // Navigation Compose
+    implementation("androidx.navigation:navigation-compose:2.7.7")
+
+    // Google Fonts for Compose (Fraunces, Inter, Noto Serif/Sans SC, JetBrains Mono)
+    implementation("androidx.compose.ui:ui-text-google-fonts")
+
     implementation("androidx.compose.ui:ui-tooling-preview")
     debugImplementation("androidx.compose.ui:ui-tooling")
 
@@ -80,4 +89,10 @@ dependencies {
     testImplementation("org.robolectric:robolectric:4.11.1")
     testImplementation("app.cash.turbine:turbine:1.0.0")
     testImplementation("androidx.test:core:1.5.0")
+
+    androidTestImplementation(composeBom)
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    androidTestImplementation("androidx.test.ext:junit:1.1.5")
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
