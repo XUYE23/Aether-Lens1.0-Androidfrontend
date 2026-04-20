@@ -1,7 +1,5 @@
 
-# Aether — Frontend<img width="280" height="275" alt="屏幕截图 2026-04-19 220409" src="https://github.com/user-attachments/assets/d315027a-376b-40d9-af9f-4ce12b643eb6" />
-
-
+# Aether — Frontend
 
 > *Ambient presence. Quiet intelligence. Always with you.*
 
