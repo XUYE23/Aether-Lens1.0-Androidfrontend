@@ -34,6 +34,17 @@ private fun defaultToolList() = listOf(
     ToolState(id = "email",    name = "邮件", icon = Icons.Default.Email,             iconTint = Color(0xFF9C27B0), isAuthorized = false),
 )
 
+enum class DeviceWorkingStatus {
+    WORKING,
+    SLEEPING,
+    CONPRESSING,
+}
+
+data class PersonalDeviceUiState(
+    val batteryLevel: Int = 72,
+    val workingStatus: DeviceWorkingStatus = DeviceWorkingStatus.WORKING,
+)
+
 data class PersonalSpaceUiState(
     val profileTraits: List<String> = listOf(
         "Agent Tech 极客",
@@ -75,6 +86,7 @@ data class PersonalSpaceUiState(
         )
     ),
     val activeApiId: String? = null,
+    val deviceUiState: PersonalDeviceUiState = PersonalDeviceUiState(),
     // ── 危险模式 ──────────────────────────────────────────────────────────────────
     val isDangerModeActive: Boolean = false,
     val showDangerWarningDialog: Boolean = false,
@@ -141,6 +153,14 @@ class MainViewModel(
         if (uri == null) return
         viewModelScope.launch {
             repository.saveAvatarUri(uri.toString())
+        }
+    }
+
+    fun updateDeviceStatus(status: DeviceWorkingStatus) {
+        _uiState.update {
+            it.copy(
+                deviceUiState = it.deviceUiState.copy(workingStatus = status)
+            )
         }
     }
 
@@ -246,8 +266,41 @@ class MainViewModel(
 
     fun addApiConfig(config: ApiConfig) {
         val updated = _uiState.value.apiConfigs + config
+        val nextActiveId = _uiState.value.activeApiId ?: config.id
+        _uiState.update { it.copy(apiConfigs = updated, activeApiId = nextActiveId) }
+        viewModelScope.launch {
+            repository.saveApiConfigs(updated)
+            repository.saveActiveApiId(nextActiveId)
+        }
+    }
+
+    fun updateApiConfig(config: ApiConfig) {
+        val updated = _uiState.value.apiConfigs.map {
+            if (it.id == config.id) config else it
+        }
         _uiState.update { it.copy(apiConfigs = updated) }
         viewModelScope.launch { repository.saveApiConfigs(updated) }
+    }
+
+    fun deleteApiConfig(id: String) {
+        val updated = _uiState.value.apiConfigs.filterNot { it.id == id }
+        val nextActiveId = when {
+            _uiState.value.activeApiId != id -> _uiState.value.activeApiId
+            updated.isNotEmpty() -> updated.first().id
+            else -> null
+        }
+        _uiState.update {
+            it.copy(
+                apiConfigs = updated,
+                activeApiId = nextActiveId
+            )
+        }
+        viewModelScope.launch {
+            repository.saveApiConfigs(updated)
+            if (nextActiveId != null) {
+                repository.saveActiveApiId(nextActiveId)
+            }
+        }
     }
 
     fun saveUserName() {

@@ -23,7 +23,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 data class DeviceUiState(
     val boundDevices: List<DeviceState> = emptyList(),
     val isScanning: Boolean = false,
-    val scannedDevices: List<ScannedDevice> = emptyList(), // 已按 rssi 降序
+    val scannedDevices: List<ScannedDevice> = emptyList(), // 保持首次发现顺序稳定
     val connectingMac: String? = null,    // 正在连接中的设备 MAC
     val showScanSheet: Boolean = false,
     val permissionDenied: Boolean = false
@@ -108,6 +108,41 @@ class DeviceViewModel(
                     showScanSheet = false
                 )
             }
+        }
+    }
+
+    fun connectAsPrimaryDevice(scanned: ScannedDevice) {
+        var shouldConnect = false
+        _uiState.update { state ->
+            if (state.connectingMac != null) return@update state
+            shouldConnect = true
+            state.copy(connectingMac = scanned.macAddress)
+        }
+        if (!shouldConnect) return
+        viewModelScope.launch {
+            val newDevice = repository.simulateConnect(scanned)
+            val retainedDevices = _uiState.value.boundDevices.map { it.copy(isConnected = false) }
+            repository.saveDevices(retainedDevices + newDevice)
+            stopScan()
+            _uiState.update {
+                it.copy(
+                    connectingMac = null,
+                    showScanSheet = false
+                )
+            }
+        }
+    }
+
+    fun disconnectDevice(deviceId: String) {
+        viewModelScope.launch {
+            val devices = _uiState.value.boundDevices.map { device ->
+                if (device.id == deviceId) {
+                    device.copy(isConnected = false)
+                } else {
+                    device
+                }
+            }
+            repository.saveDevices(devices)
         }
     }
 

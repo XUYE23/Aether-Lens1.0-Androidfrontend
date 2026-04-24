@@ -103,4 +103,64 @@ class MainViewModelProfileTest {
 
         assertNull(repository.avatarUriString.first())
     }
+
+    @Test
+    fun `updateDeviceStatus updates current device working state`() = runTest {
+        viewModel.updateDeviceStatus(DeviceWorkingStatus.CONPRESSING)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(
+            DeviceWorkingStatus.CONPRESSING,
+            viewModel.uiState.value.deviceUiState.workingStatus
+        )
+    }
+
+    @Test
+    fun `addApiConfig selects new config when no active config exists`() = runTest {
+        val config = ApiConfig(
+            id = "custom-a",
+            providerName = "Custom",
+            apiKey = "sk-custom-123456",
+            requestUrl = "https://custom.example.com/v1"
+        )
+
+        viewModel.addApiConfig(config)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("custom-a", viewModel.uiState.value.activeApiId)
+    }
+
+    @Test
+    fun `updateApiConfig replaces matching saved config`() = runTest {
+        val original = viewModel.uiState.value.apiConfigs.first()
+        val updated = original.copy(
+            providerName = "OpenAI Pro",
+            requestUrl = "https://proxy.example.com/v1"
+        )
+
+        viewModel.updateApiConfig(updated)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(
+            "OpenAI Pro",
+            viewModel.uiState.value.apiConfigs.first { it.id == original.id }.providerName
+        )
+        assertEquals(
+            "https://proxy.example.com/v1",
+            viewModel.uiState.value.apiConfigs.first { it.id == original.id }.requestUrl
+        )
+    }
+
+    @Test
+    fun `deleteApiConfig reassigns active id to first remaining config`() = runTest {
+        val firstId = viewModel.uiState.value.apiConfigs.first().id
+        val secondId = viewModel.uiState.value.apiConfigs[1].id
+
+        viewModel.selectApi(firstId)
+        dispatcher.scheduler.advanceUntilIdle()
+        viewModel.deleteApiConfig(firstId)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(secondId, viewModel.uiState.value.activeApiId)
+    }
 }

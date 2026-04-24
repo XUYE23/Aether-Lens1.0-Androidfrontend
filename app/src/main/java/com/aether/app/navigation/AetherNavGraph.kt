@@ -7,8 +7,13 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.aether.app.DeviceUiState
+import com.aether.app.PersonalDeviceUiState
+import com.aether.app.data.ApiConfig
 import com.aether.app.data.IUserPreferencesRepository
+import com.aether.app.data.ScannedDevice
 import com.aether.app.ui.screens.AetherWorkspaceScreen
+import com.aether.app.ui.screens.DeviceDetailScreen
 import com.aether.app.ui.screens.OnboardStep1Name
 import com.aether.app.ui.screens.OnboardStep2Voiceprint
 import com.aether.app.ui.screens.OnboardStep3CorePortrait
@@ -16,6 +21,7 @@ import com.aether.app.ui.screens.OnboardStep4Bluetooth
 import com.aether.app.ui.screens.OnboardStep5Api
 import com.aether.app.ui.screens.OnboardStep6Permissions
 import com.aether.app.ui.screens.PersonalSpaceScreen
+import com.aether.app.ui.screens.ProductPhilosophyScreen
 import com.aether.app.ui.screens.SplashScreen
 
 object Routes {
@@ -28,6 +34,9 @@ object Routes {
     const val ONBOARD_6 = "onboard/6"
     const val WORKSPACE = "workspace"
     const val PERSONAL  = "personal"
+    const val PRODUCT_PHILOSOPHY = "product/philosophy"
+    const val DEVICE_DETAIL = "device/detail"
+    const val DEVICE_SWITCH = "device/switch"
 }
 
 fun determinePostSplashRoute(userName: String): String {
@@ -49,7 +58,20 @@ fun AetherNavGraph(
     postSplashDestination: String = Routes.WORKSPACE,
     onSaveUserName: (String) -> Unit = {},
     avatarUriString: String? = null,
+    deviceUiState: PersonalDeviceUiState = PersonalDeviceUiState(),
+    apiConfigs: List<ApiConfig> = emptyList(),
+    activeApiId: String? = null,
+    boundDeviceUiState: DeviceUiState = DeviceUiState(),
     onSaveAvatarUri: (Uri?) -> Unit = {},
+    onSelectApi: (String) -> Unit = {},
+    onAddApi: (ApiConfig) -> Unit = {},
+    onUpdateApi: (ApiConfig) -> Unit = {},
+    onDeleteApi: (String) -> Unit = {},
+    onDisconnectDevice: (String) -> Unit = {},
+    onConnectPrimaryDevice: (ScannedDevice) -> Unit = {},
+    onStartBluetoothScan: () -> Unit = {},
+    onStopBluetoothScan: () -> Unit = {},
+    onBluetoothPermissionDenied: () -> Unit = {},
     onSaveApiKey: (String) -> Unit = {},
     userName: String = "",
 ) {
@@ -125,9 +147,53 @@ fun AetherNavGraph(
             PersonalSpaceScreen(
                 userName = userName,
                 avatarUriString = avatarUriString,
+                deviceUiState = deviceUiState,
+                apiConfigs = apiConfigs,
+                activeApiId = activeApiId,
                 onSaveUserName = onSaveUserName,
                 onSaveAvatarUri = onSaveAvatarUri,
+                onSelectApi = onSelectApi,
+                onAddApi = onAddApi,
+                onUpdateApi = onUpdateApi,
+                onDeleteApi = onDeleteApi,
+                onOpenDeviceDetail = {
+                    navController.navigate(Routes.DEVICE_DETAIL)
+                },
+                onOpenProductPhilosophy = {
+                    navController.navigate(Routes.PRODUCT_PHILOSOPHY)
+                },
                 onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Routes.PRODUCT_PHILOSOPHY) {
+            ProductPhilosophyScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(Routes.DEVICE_DETAIL) {
+            DeviceDetailScreen(
+                userName = userName,
+                deviceUiState = boundDeviceUiState,
+                onBack = { navController.popBackStack() },
+                onDisconnectDevice = onDisconnectDevice,
+                onOpenSwitchDevice = { navController.navigate(Routes.DEVICE_SWITCH) }
+            )
+        }
+
+        composable(Routes.DEVICE_SWITCH) {
+            DeviceDetailScreen(
+                userName = userName,
+                deviceUiState = boundDeviceUiState,
+                mode = com.aether.app.ui.screens.DeviceDetailMode.Switch,
+                onBack = { navController.popBackStack() },
+                onDismissSwitch = { navController.popBackStack() },
+                onStartBluetoothScan = onStartBluetoothScan,
+                onStopBluetoothScan = onStopBluetoothScan,
+                onBluetoothPermissionDenied = onBluetoothPermissionDenied,
+                onConnectPrimaryDevice = { scannedDevice ->
+                    onConnectPrimaryDevice(scannedDevice)
+                    navController.popBackStack()
+                }
             )
         }
     }

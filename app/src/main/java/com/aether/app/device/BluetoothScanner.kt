@@ -13,7 +13,8 @@ import kotlinx.coroutines.flow.callbackFlow
 class BluetoothScanner(private val context: Context) {
 
     /**
-     * 返回实时扫描结果流。每当发现或更新设备时发出完整的、按 rssi 降序排列的列表。
+     * 返回实时扫描结果流。每当发现或更新设备时发出完整列表。
+     * 列表保持首次发现顺序稳定，仅更新对应设备的 rssi，避免 UI 因实时信号波动而跳动。
      * 调用方负责在适当时机取消 collect（callbackFlow 的 awaitClose 会自动停止 BLE 扫描）。
      * 注意：调用前必须已持有 BLUETOOTH_SCAN（API≥31）或 BLUETOOTH（API<31）权限。
      */
@@ -33,7 +34,7 @@ class BluetoothScanner(private val context: Context) {
         }
 
         // 用 Map 存储已发现设备，以 MAC 地址去重
-        val discovered = mutableMapOf<String, ScannedDevice>()
+        val discovered = linkedMapOf<String, ScannedDevice>()
 
         val callback = object : ScanCallback() {
             override fun onScanResult(callbackType: Int, result: ScanResult) {
@@ -43,7 +44,7 @@ class BluetoothScanner(private val context: Context) {
                     rssi = result.rssi
                 )
                 discovered[device.macAddress] = device
-                trySend(discovered.values.sortedByDescending { it.rssi })
+                trySend(discovered.values.toList())
             }
 
             override fun onScanFailed(errorCode: Int) {

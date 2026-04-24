@@ -16,8 +16,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.view.WindowCompat
-import com.aether.app.data.IUserPreferencesRepository
 import com.aether.app.data.UserPreferencesRepository
+import com.aether.app.data.WorkStatus
+import com.aether.app.device.BluetoothScanner
+import com.aether.app.device.DeviceRepository
 import com.aether.app.navigation.AetherNavGraph
 import com.aether.app.navigation.Routes
 import com.aether.app.navigation.determinePostSplashRoute
@@ -28,9 +30,14 @@ import kotlinx.coroutines.flow.first
 class MainActivity : ComponentActivity() {
 
     private val repository by lazy { UserPreferencesRepository(applicationContext) }
+    private val deviceRepository by lazy { DeviceRepository(applicationContext) }
+    private val bluetoothScanner by lazy { BluetoothScanner(applicationContext) }
 
     private val mainViewModel: MainViewModel by viewModels {
         MainViewModelFactory(repository)
+    }
+    private val deviceViewModel: DeviceViewModel by viewModels {
+        DeviceViewModelFactory(deviceRepository, bluetoothScanner)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -41,6 +48,9 @@ class MainActivity : ComponentActivity() {
             AetherTheme {
                 val userName by mainViewModel.userName.collectAsState()
                 val avatarUriString by mainViewModel.avatarUriString.collectAsState()
+                val personalSpaceState by mainViewModel.uiState.collectAsState()
+                val deviceState by deviceViewModel.uiState.collectAsState()
+                val personalDeviceUiState = deviceState.toPersonalDeviceUiState()
 
                 // The logo splash should always play on launch. We only decide where
                 // to go AFTER the splash based on the persisted onboarding state.
@@ -61,8 +71,21 @@ class MainActivity : ComponentActivity() {
                             postSplashDestination = destination,
                             userName = userName,
                             avatarUriString = avatarUriString,
+                            deviceUiState = personalDeviceUiState,
+                            apiConfigs = personalSpaceState.apiConfigs,
+                            activeApiId = personalSpaceState.activeApiId,
+                            boundDeviceUiState = deviceState,
                             onSaveUserName = mainViewModel::updateUserName,
                             onSaveAvatarUri = { uri: Uri? -> mainViewModel.onAvatarSelected(uri) },
+                            onSelectApi = mainViewModel::selectApi,
+                            onAddApi = mainViewModel::addApiConfig,
+                            onUpdateApi = mainViewModel::updateApiConfig,
+                            onDeleteApi = mainViewModel::deleteApiConfig,
+                            onDisconnectDevice = deviceViewModel::disconnectDevice,
+                            onConnectPrimaryDevice = deviceViewModel::connectAsPrimaryDevice,
+                            onStartBluetoothScan = deviceViewModel::startBluetoothScan,
+                            onStopBluetoothScan = deviceViewModel::stopScan,
+                            onBluetoothPermissionDenied = deviceViewModel::onPermissionDenied,
                             onSaveApiKey = { _ ->
                                 // API key storage can be wired to DataStore or EncryptedSharedPreferences
                             }
@@ -72,4 +95,17 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+}
+
+private fun DeviceUiState.toPersonalDeviceUiState(): PersonalDeviceUiState {
+    val currentDevice = boundDevices.firstOrNull { it.isConnected } ?: boundDevices.firstOrNull()
+    val workingStatus = when (currentDevice?.workStatus) {
+        WorkStatus.SLEEPING -> DeviceWorkingStatus.SLEEPING
+        WorkStatus.ORGANIZING -> DeviceWorkingStatus.CONPRESSING
+        else -> DeviceWorkingStatus.WORKING
+    }
+    return PersonalDeviceUiState(
+        batteryLevel = currentDevice?.batteryLevel ?: 72,
+        workingStatus = workingStatus
+    )
 }

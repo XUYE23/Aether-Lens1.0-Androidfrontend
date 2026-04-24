@@ -63,6 +63,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
 import com.aether.app.R
+import com.aether.app.DeviceWorkingStatus
+import com.aether.app.PersonalDeviceUiState
+import com.aether.app.data.ApiConfig
 
 data class PortraitCard(
     val category: String,
@@ -217,10 +220,19 @@ private fun GlassesMark(
 fun PersonalSpaceScreen(
     userName: String,
     avatarUriString: String? = null,
+    deviceUiState: PersonalDeviceUiState = PersonalDeviceUiState(),
+    apiConfigs: List<ApiConfig> = emptyList(),
+    activeApiId: String? = null,
     daysWithAether: Int = 28,
     portraitGroups: List<PortraitGroup> = defaultPortraitGroups(),
     onSaveUserName: (String) -> Unit = {},
     onSaveAvatarUri: (Uri?) -> Unit = {},
+    onSelectApi: (String) -> Unit = {},
+    onAddApi: (ApiConfig) -> Unit = {},
+    onUpdateApi: (ApiConfig) -> Unit = {},
+    onDeleteApi: (String) -> Unit = {},
+    onOpenDeviceDetail: () -> Unit = {},
+    onOpenProductPhilosophy: () -> Unit = {},
     onBack: () -> Unit = {},
     onAddCard: (group: String) -> Unit = {},
     onEditCard: (PortraitCard) -> Unit = {},
@@ -238,6 +250,13 @@ fun PersonalSpaceScreen(
     var portraitDraftText by remember { mutableStateOf("") }
     var portraitDraftError by remember { mutableStateOf(false) }
     var nameDraft by remember(userName) { mutableStateOf(userName) }
+    var isApiListExpanded by remember { mutableStateOf(false) }
+    var apiDialogMode by remember { mutableStateOf<ApiDialogMode?>(null) }
+    var editingApiConfig by remember { mutableStateOf<ApiConfig?>(null) }
+    var apiNameDraft by remember { mutableStateOf("") }
+    var apiKeyDraft by remember { mutableStateOf("") }
+    var apiUrlDraft by remember { mutableStateOf("") }
+    var apiDraftError by remember { mutableStateOf(false) }
 
     val avatarPickerLauncher = rememberLauncherForActivityResult(
         contract = OpenDocument(),
@@ -356,11 +375,38 @@ fun PersonalSpaceScreen(
 
                 Spacer(modifier = Modifier.height(56.dp))
 
-                DeviceSection(userName = userName)
+                DeviceSection(
+                    userName = userName,
+                    deviceUiState = deviceUiState,
+                    onClick = onOpenDeviceDetail
+                )
 
                 Spacer(modifier = Modifier.height(40.dp))
 
-                ApiModelSection()
+                ApiModelSection(
+                    apiConfigs = apiConfigs,
+                    activeApiId = activeApiId,
+                    isExpanded = isApiListExpanded,
+                    onToggleExpanded = { isApiListExpanded = !isApiListExpanded },
+                    onSelectApi = onSelectApi,
+                    onEditApi = { config ->
+                        editingApiConfig = config
+                        apiDialogMode = ApiDialogMode.EDIT
+                        apiNameDraft = config.providerName
+                        apiKeyDraft = config.apiKey
+                        apiUrlDraft = config.requestUrl
+                        apiDraftError = false
+                    },
+                    onDeleteApi = onDeleteApi,
+                    onAddApi = {
+                        editingApiConfig = null
+                        apiDialogMode = ApiDialogMode.ADD
+                        apiNameDraft = ""
+                        apiKeyDraft = ""
+                        apiUrlDraft = ""
+                        apiDraftError = false
+                    }
+                )
 
                 Spacer(modifier = Modifier.height(40.dp))
 
@@ -368,7 +414,7 @@ fun PersonalSpaceScreen(
 
                 Spacer(modifier = Modifier.height(40.dp))
 
-                AboutSection()
+                AboutSection(onOpenProductPhilosophy = onOpenProductPhilosophy)
 
                 ClosingQuoteSection()
 
@@ -485,6 +531,64 @@ fun PersonalSpaceScreen(
                 )
                 isDeletePortraitDialogVisible = false
                 selectedPortrait = null
+            }
+        )
+    }
+
+    if (apiDialogMode != null) {
+        ApiConfigDialog(
+            mode = apiDialogMode!!,
+            name = apiNameDraft,
+            apiKey = apiKeyDraft,
+            requestUrl = apiUrlDraft,
+            isError = apiDraftError,
+            onNameChange = {
+                apiNameDraft = it
+                apiDraftError = false
+            },
+            onApiKeyChange = {
+                apiKeyDraft = it
+                apiDraftError = false
+            },
+            onRequestUrlChange = {
+                apiUrlDraft = it
+                apiDraftError = false
+            },
+            onDismiss = {
+                apiDialogMode = null
+                editingApiConfig = null
+                apiDraftError = false
+            },
+            onConfirm = {
+                val providerName = apiNameDraft.trim()
+                val apiKey = apiKeyDraft.trim()
+                val requestUrl = apiUrlDraft.trim()
+                if (providerName.isEmpty() || apiKey.isEmpty() || requestUrl.isEmpty()) {
+                    apiDraftError = true
+                } else {
+                    val existing = editingApiConfig
+                    if (apiDialogMode == ApiDialogMode.EDIT && existing != null) {
+                        onUpdateApi(
+                            existing.copy(
+                                providerName = providerName,
+                                apiKey = apiKey,
+                                requestUrl = requestUrl
+                            )
+                        )
+                    } else {
+                        onAddApi(
+                            ApiConfig(
+                                providerName = providerName,
+                                apiKey = apiKey,
+                                requestUrl = requestUrl
+                            )
+                        )
+                    }
+                    apiDialogMode = null
+                    editingApiConfig = null
+                    apiDraftError = false
+                    isApiListExpanded = true
+                }
             }
         )
     }
@@ -1544,7 +1648,13 @@ private fun DeletePortraitDialog(
 }
 
 @Composable
-private fun DeviceSection(userName: String) {
+private fun DeviceSection(
+    userName: String,
+    deviceUiState: PersonalDeviceUiState,
+    onClick: () -> Unit,
+) {
+    val statusColor = deviceStatusColor(deviceUiState.workingStatus)
+
     SectionHeader(label = "Device")
     Box(
         modifier = Modifier
@@ -1553,7 +1663,7 @@ private fun DeviceSection(userName: String) {
             .clip(RoundedCornerShape(18.dp))
             .background(Cream100)
             .padding(horizontal = 20.dp, vertical = 18.dp)
-            .clickable {}
+            .clickable(onClick = onClick)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -1593,7 +1703,7 @@ private fun DeviceSection(userName: String) {
                         )
                     }
                     Text(
-                        text = "72% · v0.8.2",
+                        text = "${deviceUiState.batteryLevel}%",
                         style = TextStyle(
                             fontFamily = FontMono, fontSize = 10.sp,
                             letterSpacing = 0.08.sp, color = Ink500
@@ -1605,12 +1715,17 @@ private fun DeviceSection(userName: String) {
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(5.dp)
                 ) {
-                    Box(modifier = Modifier.size(5.dp).clip(CircleShape).background(DawnEmber))
+                    Box(
+                        modifier = Modifier
+                            .size(5.dp)
+                            .clip(CircleShape)
+                            .background(statusColor)
+                    )
                     Text(
-                        text = "CONNECTED · 2H AGO",
+                        text = deviceStatusLabel(deviceUiState.workingStatus),
                         style = TextStyle(
                             fontFamily = FontMono, fontSize = 9.sp,
-                            letterSpacing = 0.14.sp, color = DawnEmber
+                            letterSpacing = 0.14.sp, color = statusColor
                         )
                     )
                 }
@@ -1620,8 +1735,35 @@ private fun DeviceSection(userName: String) {
     }
 }
 
+private fun deviceStatusLabel(status: DeviceWorkingStatus): String {
+    return when (status) {
+        DeviceWorkingStatus.WORKING -> "Working"
+        DeviceWorkingStatus.SLEEPING -> "Sleeping"
+        DeviceWorkingStatus.CONPRESSING -> "Conpressing"
+    }
+}
+
+private fun deviceStatusColor(status: DeviceWorkingStatus): Color {
+    return when (status) {
+        DeviceWorkingStatus.WORKING -> DawnEmber
+        DeviceWorkingStatus.SLEEPING -> Ink300
+        DeviceWorkingStatus.CONPRESSING -> DawnDusk
+    }
+}
+
 @Composable
-private fun ApiModelSection() {
+private fun ApiModelSection(
+    apiConfigs: List<ApiConfig>,
+    activeApiId: String?,
+    isExpanded: Boolean,
+    onToggleExpanded: () -> Unit,
+    onSelectApi: (String) -> Unit,
+    onEditApi: (ApiConfig) -> Unit,
+    onDeleteApi: (String) -> Unit,
+    onAddApi: () -> Unit,
+) {
+    val activeConfig = apiConfigs.firstOrNull { it.id == activeApiId } ?: apiConfigs.firstOrNull()
+
     SectionHeader(label = "API & Model")
     Column(
         modifier = Modifier
@@ -1629,19 +1771,474 @@ private fun ApiModelSection() {
             .clip(RoundedCornerShape(18.dp))
             .background(Cream100)
     ) {
-        PSRow(
-            title = "Anthropic · Claude 3.5 Sonnet",
-            sub = "api.anthropic.com · sk-ant-••••4f3a",
-            showArrow = true
-        )
+        ApiCurrentConfigCard(activeConfig = activeConfig)
         DividerLine()
-        PSRow(
-            title = "切换模型",
-            sub = "OpenAI · Mistral · 本地 Ollama",
-            showArrow = true,
-            last = true
+        ApiExpandRow(
+            isExpanded = isExpanded,
+            count = apiConfigs.size,
+            onClick = onToggleExpanded
+        )
+        if (isExpanded) {
+            DividerLine()
+            Column(
+                modifier = Modifier
+                    .padding(horizontal = 16.dp, vertical = 14.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Cream50.copy(alpha = 0.72f))
+                    .border(1.dp, Ink900.copy(alpha = 0.05f), RoundedCornerShape(16.dp))
+                    .padding(horizontal = 12.dp, vertical = 12.dp)
+            ) {
+                Text(
+                    text = "SAVED CONFIGS",
+                    style = TextStyle(
+                        fontFamily = FontMono,
+                        fontSize = 9.sp,
+                        letterSpacing = 0.18.sp,
+                        color = Ink300
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                if (apiConfigs.isEmpty()) {
+                    Text(
+                        text = "还没有保存 API 配置。新增一组后，就可以在这里切换当前模型。",
+                        style = TextStyle(
+                            fontFamily = FontCnBody,
+                            fontSize = 12.sp,
+                            lineHeight = 18.sp,
+                            color = Ink500
+                        )
+                    )
+                } else {
+                    apiConfigs.forEachIndexed { index, config ->
+                        if (index > 0) {
+                            Box(
+                                modifier = Modifier
+                                    .padding(vertical = 8.dp)
+                                    .fillMaxWidth()
+                                    .height(1.dp)
+                                    .background(Ink900.copy(alpha = 0.05f))
+                            )
+                        }
+                        ApiConfigRow(
+                            config = config,
+                            isActive = config.id == activeConfig?.id,
+                            onSelect = { onSelectApi(config.id) },
+                            onEdit = { onEditApi(config) },
+                            onDelete = { onDeleteApi(config.id) }
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                TextButton(
+                    onClick = onAddApi,
+                    modifier = Modifier.align(Alignment.Start),
+                    colors = ButtonDefaults.textButtonColors(contentColor = DawnEmber)
+                ) {
+                    Text(
+                        text = "+ 新增配置",
+                        style = TextStyle(
+                            fontFamily = FontCnBody,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = DawnEmber
+                        )
+                    )
+                }
+            }
+        }
+    }
+}
+
+private enum class ApiDialogMode {
+    ADD,
+    EDIT,
+}
+
+@Composable
+private fun ApiCurrentConfigCard(activeConfig: ApiConfig?) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 16.dp)
+    ) {
+        Text(
+            text = activeConfig?.providerName ?: "当前未设置模型",
+            style = TextStyle(
+                fontFamily = FontCnBody,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                color = Ink900
+            )
+        )
+        Spacer(modifier = Modifier.height(5.dp))
+        Text(
+            text = activeConfig?.requestUrl?.ifBlank { "未填写 URL" } ?: "未填写 URL",
+            style = TextStyle(
+                fontFamily = FontMono,
+                fontSize = 10.sp,
+                letterSpacing = 0.04.sp,
+                color = Ink500
+            )
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = activeConfig?.apiKey?.let(::maskApiKey) ?: "未填写 API Key",
+            style = TextStyle(
+                fontFamily = FontMono,
+                fontSize = 10.sp,
+                letterSpacing = 0.04.sp,
+                color = Ink300
+            )
         )
     }
+}
+
+@Composable
+private fun ApiExpandRow(
+    isExpanded: Boolean,
+    count: Int,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 20.dp, vertical = 14.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "切换模型",
+                style = TextStyle(
+                    fontFamily = FontCnBody,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Ink900
+                )
+            )
+            Spacer(modifier = Modifier.height(3.dp))
+            Text(
+                text = if (count == 0) "点击展开并新增你的第一组 API 信息" else "已保存 $count 组 API 信息，点击展开管理",
+                style = TextStyle(
+                    fontFamily = FontCnBody,
+                    fontSize = 11.sp,
+                    lineHeight = 17.sp,
+                    color = Ink500
+                )
+            )
+        }
+        Text(
+            text = if (isExpanded) "∧" else "∨",
+            style = TextStyle(
+                fontFamily = FontMono,
+                fontSize = 15.sp,
+                color = DawnEmber
+            )
+        )
+    }
+}
+
+@Composable
+private fun ApiConfigRow(
+    config: ApiConfig,
+    isActive: Boolean,
+    onSelect: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(if (isActive) DawnHaze.copy(alpha = 0.2f) else Color.Transparent)
+            .clickable(onClick = onSelect)
+            .padding(horizontal = 10.dp, vertical = 10.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(9.dp)
+                    .clip(CircleShape)
+                    .background(if (isActive) DawnEmber else Ink200)
+            )
+            Text(
+                text = config.providerName,
+                style = TextStyle(
+                    fontFamily = FontCnBody,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Ink900
+                ),
+                modifier = Modifier.weight(1f)
+            )
+            if (isActive) {
+                Text(
+                    text = "当前",
+                    style = TextStyle(
+                        fontFamily = FontMono,
+                        fontSize = 9.sp,
+                        letterSpacing = 0.12.sp,
+                        color = DawnEmber
+                    )
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        Text(
+            text = config.requestUrl,
+            style = TextStyle(
+                fontFamily = FontMono,
+                fontSize = 10.sp,
+                color = Ink500,
+                lineHeight = 15.sp
+            )
+        )
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        Text(
+            text = maskApiKey(config.apiKey),
+            style = TextStyle(
+                fontFamily = FontMono,
+                fontSize = 10.sp,
+                color = Ink300
+            )
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            TextButton(
+                onClick = onEdit,
+                colors = ButtonDefaults.textButtonColors(contentColor = Ink700),
+            ) {
+                Text(
+                    text = "编辑",
+                    style = TextStyle(
+                        fontFamily = FontCnBody,
+                        fontSize = 12.sp,
+                        color = Ink700
+                    )
+                )
+            }
+            TextButton(
+                onClick = onDelete,
+                colors = ButtonDefaults.textButtonColors(contentColor = DawnEmber),
+            ) {
+                Text(
+                    text = "删除",
+                    style = TextStyle(
+                        fontFamily = FontCnBody,
+                        fontSize = 12.sp,
+                        color = DawnEmber
+                    )
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ApiConfigDialog(
+    mode: ApiDialogMode,
+    name: String,
+    apiKey: String,
+    requestUrl: String,
+    isError: Boolean,
+    onNameChange: (String) -> Unit,
+    onApiKeyChange: (String) -> Unit,
+    onRequestUrlChange: (String) -> Unit,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(30.dp))
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Cream50,
+                            Cream100.copy(alpha = 0.96f)
+                        )
+                    )
+                )
+                .border(1.dp, Ink900.copy(alpha = 0.06f), RoundedCornerShape(30.dp))
+                .padding(horizontal = 22.dp, vertical = 24.dp)
+        ) {
+            Column {
+                Text(
+                    text = if (mode == ApiDialogMode.ADD) "NEW API MEMORY" else "REFINE API MEMORY",
+                    style = TextStyle(
+                        fontFamily = FontMono,
+                        fontSize = 10.sp,
+                        letterSpacing = 0.18.sp,
+                        color = Ink300
+                    )
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = if (mode == ApiDialogMode.ADD) "新增一组 API 配置" else "编辑这组 API 配置",
+                    style = TextStyle(
+                        fontFamily = FontCnDisplay,
+                        fontSize = 26.sp,
+                        fontWeight = FontWeight.Normal,
+                        color = Ink900
+                    )
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "请输入名称、API Key 与请求 URL。保存后，你可以在当前页面直接切换使用。",
+                    style = TextStyle(
+                        fontFamily = FontCnBody,
+                        fontSize = 12.sp,
+                        lineHeight = 19.sp,
+                        color = Ink500
+                    )
+                )
+                Spacer(modifier = Modifier.height(18.dp))
+                ApiField(
+                    label = "名称",
+                    value = name,
+                    placeholder = "例如 OpenAI / DeepSeek / 内部代理",
+                    isError = isError && name.isBlank(),
+                    onValueChange = onNameChange
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                ApiField(
+                    label = "API Key",
+                    value = apiKey,
+                    placeholder = "输入完整 API Key",
+                    isError = isError && apiKey.isBlank(),
+                    onValueChange = onApiKeyChange
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                ApiField(
+                    label = "URL",
+                    value = requestUrl,
+                    placeholder = "https://...",
+                    isError = isError && requestUrl.isBlank(),
+                    onValueChange = onRequestUrlChange
+                )
+                if (isError) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = "三个字段都需要填写完整。",
+                        style = TextStyle(
+                            fontFamily = FontCnBody,
+                            fontSize = 11.sp,
+                            color = DawnEmber
+                        )
+                    )
+                }
+                Spacer(modifier = Modifier.height(20.dp))
+                Button(
+                    onClick = onConfirm,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(999.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Ink900,
+                        contentColor = Cream50
+                    )
+                ) {
+                    Text(
+                        text = if (mode == ApiDialogMode.ADD) "保存配置" else "保存修改",
+                        style = TextStyle(
+                            fontFamily = FontCnBody,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    )
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.textButtonColors(contentColor = Ink500)
+                ) {
+                    Text(
+                        text = "再想想",
+                        style = TextStyle(
+                            fontFamily = FontCnBody,
+                            fontSize = 13.sp,
+                            color = Ink500
+                        )
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ApiField(
+    label: String,
+    value: String,
+    placeholder: String,
+    isError: Boolean,
+    onValueChange: (String) -> Unit,
+) {
+    Column {
+        Text(
+            text = label,
+            style = TextStyle(
+                fontFamily = FontMono,
+                fontSize = 9.sp,
+                letterSpacing = 0.14.sp,
+                color = Ink500
+            )
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            singleLine = true,
+            isError = isError,
+            placeholder = {
+                Text(
+                    text = placeholder,
+                    style = TextStyle(
+                        fontFamily = FontCnBody,
+                        fontSize = 12.sp,
+                        color = Ink300
+                    )
+                )
+            },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(18.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = Cream50.copy(alpha = 0.96f),
+                unfocusedContainerColor = Cream50.copy(alpha = 0.9f),
+                focusedBorderColor = DawnPeach.copy(alpha = 0.8f),
+                unfocusedBorderColor = Ink900.copy(alpha = 0.08f),
+                errorBorderColor = DawnEmber,
+                focusedTextColor = Ink900,
+                unfocusedTextColor = Ink900,
+                cursorColor = DawnEmber
+            ),
+            textStyle = TextStyle(
+                fontFamily = FontCnBody,
+                fontSize = 13.sp,
+                color = Ink900
+            )
+        )
+    }
+}
+
+private fun maskApiKey(key: String): String {
+    if (key.length <= 8) return "••••${key.takeLast(2)}"
+    return "${key.take(4)}••••${key.takeLast(4)}"
 }
 
 @Composable
@@ -1682,7 +2279,9 @@ private fun PermissionsSection(permStates: List<androidx.compose.runtime.Mutable
 }
 
 @Composable
-private fun AboutSection() {
+private fun AboutSection(
+    onOpenProductPhilosophy: () -> Unit,
+) {
     SectionHeader(label = "About")
     Column(
         modifier = Modifier
@@ -1695,7 +2294,12 @@ private fun AboutSection() {
             detailText = "1.0.0 · build 284"
         )
         DividerLine()
-        PSRow(title = "产品哲学", sub = "为何 Aether 这样说话", showArrow = true)
+        PSRow(
+            title = "产品哲学",
+            sub = "为何 Aether 这样说话",
+            showArrow = true,
+            onClick = onOpenProductPhilosophy
+        )
         DividerLine()
         PSRow(title = "隐私政策", showArrow = true)
         DividerLine()
@@ -1754,11 +2358,18 @@ private fun PSRow(
     showArrow: Boolean = false,
     last: Boolean = false,
     titleColor: Color = Ink900,
+    onClick: (() -> Unit)? = null,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable {}
+            .then(
+                if (onClick != null) {
+                    Modifier.clickable(onClick = onClick)
+                } else {
+                    Modifier
+                }
+            )
             .padding(horizontal = 20.dp, vertical = 14.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically
